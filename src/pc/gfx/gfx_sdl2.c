@@ -150,6 +150,78 @@ static void gfx_sdl_reset_dimension_and_pos(void) {
     SDL_GL_SetSwapInterval(configWindow.vsync);
 }
 
+#ifdef __XBOX_BUILD
+static void gfx_sdl_init(const char *window_title) {
+    // Initialize the video subsystem
+    SDL_Init(SDL_INIT_VIDEO);
+
+    // Set some GL attributes (kept for reference, even if we don't create the context here)
+    SDL_GL_SetAttribute(SDL_GL_DEPTH_SIZE, 24);
+    SDL_GL_SetAttribute(SDL_GL_DOUBLEBUFFER, 1);
+
+#ifdef USE_GLES
+    SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 2);  // For hardware acceleration on devices like the RPi
+    SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 0);
+    SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_ES);
+#endif
+
+    // SDL_GL_SetAttribute(SDL_GL_MULTISAMPLEBUFFERS, 1);
+    // SDL_GL_SetAttribute(SDL_GL_MULTISAMPLESAMPLES, 4);
+
+    // int xpos = (configWindow.x == WAPI_WIN_CENTERPOS) ? SDL_WINDOWPOS_CENTERED : configWindow.x;
+    // int ypos = (configWindow.y == WAPI_WIN_CENTERPOS) ? SDL_WINDOWPOS_CENTERED : configWindow.y;
+
+    // Commented out so we don't create our own window:
+    // wnd = SDL_CreateWindow(
+    //     window_title,
+    //     xpos, ypos, configWindow.w, configWindow.h,
+    //     SDL_WINDOW_OPENGL | SDL_WINDOW_SHOWN | SDL_WINDOW_RESIZABLE
+    // );
+
+    // Commented out so we don't create our own context:
+    // ctx = SDL_GL_CreateContext(wnd);
+
+    // Just check that a window/context is already current
+    if (SDL_GL_GetCurrentWindow() == NULL || SDL_GL_GetCurrentContext() == NULL) {
+        fprintf(stderr, "[gfx_sdl_init] Error: No current SDL GL Window or Context!\n");
+        exit(1);
+    }
+
+    wnd = SDL_GL_GetCurrentWindow();
+    ctx = SDL_GL_GetCurrentContext();
+
+    SDL_SetWindowTitle(wnd, window_title);
+
+    SDL_SetWindowSize(wnd, configWindow.w, configWindow.h);
+    int xpos = (configWindow.x == WAPI_WIN_CENTERPOS) ? SDL_WINDOWPOS_CENTERED : configWindow.x;
+    int ypos = (configWindow.y == WAPI_WIN_CENTERPOS) ? SDL_WINDOWPOS_CENTERED : configWindow.y;
+    SDL_SetWindowPosition(wnd, xpos, ypos);
+
+    SDL_GL_SetSwapInterval(configWindow.vsync);
+
+    gfx_sdl_set_fullscreen();
+
+
+    perf_freq = SDL_GetPerformanceFrequency();
+    frame_rate = perf_freq / FRAMERATE;
+    frame_time = SDL_GetPerformanceCounter();
+
+    for (size_t i = 0; i < sizeof(windows_scancode_table) / sizeof(SDL_Scancode); i++) {
+        inverted_scancode_table[windows_scancode_table[i]] = i;
+    }
+
+    for (size_t i = 0; i < sizeof(scancode_rmapping_extended) / sizeof(scancode_rmapping_extended[0]); i++) {
+        inverted_scancode_table[scancode_rmapping_extended[i][0]] =
+            inverted_scancode_table[scancode_rmapping_extended[i][1]] + 0x100;
+    }
+
+    for (size_t i = 0; i < sizeof(scancode_rmapping_nonextended) / sizeof(scancode_rmapping_nonextended[0]); i++) {
+        inverted_scancode_table[scancode_rmapping_nonextended[i][0]] =
+            inverted_scancode_table[scancode_rmapping_nonextended[i][1]];
+        inverted_scancode_table[scancode_rmapping_nonextended[i][1]] += 0x100;
+    }
+}
+#else
 static void gfx_sdl_init(const char *window_title) {
     SDL_Init(SDL_INIT_VIDEO);
 
@@ -197,6 +269,8 @@ static void gfx_sdl_init(const char *window_title) {
         inverted_scancode_table[scancode_rmapping_nonextended[i][1]] += 0x100;
     }
 }
+
+#endif
 
 static void gfx_sdl_main_loop(void (*run_one_game_iter)(void)) {
     run_one_game_iter();

@@ -33,6 +33,8 @@ OSX_BUILD ?= 0
 # Enable -no-pie linker option
 NO_PIE ?= 1
 
+STATIC_LINK ?= 1
+
 # Specify the target you are building for, TARGET_BITS=0 means native
 TARGET_ARCH ?= native
 TARGET_BITS ?= 0
@@ -287,6 +289,24 @@ endif
 
 LIBULTRA := $(BUILD_DIR)/libultra.a
 
+
+ifeq ($(BUILD_AS_DLL),1)
+  # On Windows, produce a .dll
+  ifeq ($(WINDOWS_BUILD),1)
+    EXE := $(BUILD_DIR)/$(TARGET).dll
+    LDFLAGS += -shared
+  else ifeq ($(HOST_OS),Darwin)
+    # On macOS, produce a .dylib
+    EXE := $(BUILD_DIR)/$(TARGET).dylib
+    # The `-undefined dynamic_lookup` option is helpful if you have no hard-coded references
+    LDFLAGS += -shared -undefined dynamic_lookup
+  else
+    # Otherwise, produce a .so
+    EXE := $(BUILD_DIR)/$(TARGET).so
+    LDFLAGS += -shared
+  endif
+endif
+
 ifeq ($(TARGET_WEB),1)
 EXE := $(BUILD_DIR)/$(TARGET).html
 	else
@@ -344,6 +364,21 @@ ifeq ($(TARGET_WEB),1)
   OPT_FLAGS := -O2 -g4 --source-map-base http://localhost:8080/
 endif
 
+
+ifeq ($(XBOX_BUILD),1)
+  VERSION_CFLAGS += -D__XBOX_BUILD
+  RENDER_API := GL
+  WINDOW_API := SDL2
+  DISCORDRPC := 0
+  BUILD_AS_DLL := 1
+  STATIC_LINK := 0
+  BETTERCAMERA := 1
+  NODRAWINGDISTANCE := 1
+  TEXTURE_FIX := 1
+  TEXTSAVES := 1
+  EXTERNAL_DATA := 1
+endif
+
 ifeq ($(TARGET_RPI),1)
 	machine = $(shell sh -c 'uname -m 2>/dev/null || echo unknown')
 # Raspberry Pi B+, Zero, etc
@@ -374,6 +409,8 @@ ifeq ($(TARGET_RPI),1)
 
         endif
 endif
+
+
 
 # File dependencies and variables for specific files
 include Makefile.split
@@ -656,7 +693,10 @@ ifeq ($(TARGET_WEB),1)
   LDFLAGS := -lm -lGL -lSDL2 -no-pie -s TOTAL_MEMORY=64MB -g4 --source-map-base http://localhost:8080/ -s "EXTRA_EXPORTED_RUNTIME_METHODS=['callMain']"
 
 else ifeq ($(WINDOWS_BUILD),1)
-  LDFLAGS := $(BITS) -march=$(TARGET_ARCH) -Llib -lpthread $(BACKEND_LDFLAGS) -static
+  LDFLAGS := $(BITS) -march=$(TARGET_ARCH) -Llib -lpthread $(BACKEND_LDFLAGS) 
+  ifeq ($(STATIC_LINK),1)
+    LDFLAGS += -static
+  endif
   ifeq ($(CROSS),)
     LDFLAGS += -no-pie
   endif

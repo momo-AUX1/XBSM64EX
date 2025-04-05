@@ -271,3 +271,58 @@ int main(int argc, char *argv[]) {
     main_func();
     return 0;
 }
+
+#if defined(_WIN32)
+
+#define EXPORTED_SYMBOL __declspec(dllexport)
+#elif defined(__APPLE__)
+
+#define EXPORTED_SYMBOL __attribute__((visibility("default")))
+#else
+
+#define EXPORTED_SYMBOL
+#endif
+
+#ifdef __XBOX_BUILD
+
+#include <SDL2/SDL.h>
+#include <GL/glew.h>
+#include <stdio.h>
+#include <stdlib.h>
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+EXPORTED_SYMBOL int external_main(SDL_Window *window, SDL_GLContext gl_context, int argc, const char *argv[]) {
+    if (SDL_GL_MakeCurrent(window, gl_context) < 0) {
+        fprintf(stderr, "SDL_GL_MakeCurrent failed: %s\n", SDL_GetError());
+        return -1;
+    }
+
+    GLenum glew_err = glewInit();
+    if (glew_err != GLEW_OK) {
+        fprintf(stderr, "Failed to initialize GLEW: %s\n", glewGetErrorString(glew_err));
+        return -1;
+    }
+
+    if (argc >= 3) {
+#ifdef _WIN32
+        _putenv_s("LOCAL_STATE_PATH", argv[2]);
+#else
+        setenv("LOCAL_STATE_PATH", argv[2], 1);
+#endif
+        for (int i = 2; i < argc - 1; i++) {
+            argv[i] = argv[i + 1];
+        }
+        argc--;
+    }
+
+    return main(argc, (char **)argv);
+}
+
+#ifdef __cplusplus
+}
+#endif
+
+#endif 

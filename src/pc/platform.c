@@ -124,6 +124,18 @@ static inline bool copy_userdata(const char *userdir) {
 const char *sys_user_path(void) {
     static char path[SYS_MAX_PATH] = { 0 };
 
+#ifdef __XBOX_BUILD
+    const char *env_path = getenv("LOCAL_STATE_PATH");
+    if (env_path) {
+        printf("Using LOCAL_STATE_PATH: %s\n", env_path);
+        strncpy(path, env_path, sizeof(path));
+        path[sizeof(path)-1] = 0; 
+        return path;
+    }
+    printf("LOCAL_STATE_PATH not found, using default path\n");
+#endif
+
+    printf("Getting user path from SDL\n");
     // get the new pref path from SDL
     char *sdlpath = SDL_GetPrefPath("", "sm64ex");
     if (sdlpath) {
@@ -136,10 +148,18 @@ const char *sys_user_path(void) {
         if (path[len-1] == '/' || path[len-1] == '\\')
             path[len-1] = 0; // strip the trailing separator
 
-        if (!fs_sys_dir_exists(path) && !fs_sys_mkdir(path))
+        printf("User path: %s\n", path);
+        
+        if (!fs_sys_dir_exists(path) && !fs_sys_mkdir(path)) {
+            printf("Failed to create user directory\n");
             path[0] = 0; // somehow failed, we got no user path
-        else
+        }
+        else {
+            printf("User directory exists or was created successfully\n");
             copy_userdata(path); // TEMPORARY: try to copy old saves, if any
+        }
+    } else {
+        printf("SDL_GetPrefPath failed\n");
     }
 
     return path;
