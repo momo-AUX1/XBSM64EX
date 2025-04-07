@@ -79,6 +79,12 @@ BASEPACK ?= base.zip
 
 WINDOWS_BUILD ?= 0
 
+# Build as a DLL
+BUILD_AS_DLL ?= 0
+
+# Xbox build, enables the __XBOX_BUILD Macros.
+XBOX_BUILD ?= 0
+
 # Attempt to detect OS
 
 ifeq ($(OS),Windows_NT)
@@ -289,24 +295,6 @@ endif
 
 LIBULTRA := $(BUILD_DIR)/libultra.a
 
-
-ifeq ($(BUILD_AS_DLL),1)
-  # On Windows, produce a .dll
-  ifeq ($(WINDOWS_BUILD),1)
-    EXE := $(BUILD_DIR)/$(TARGET).dll
-    LDFLAGS += -shared
-  else ifeq ($(HOST_OS),Darwin)
-    # On macOS, produce a .dylib
-    EXE := $(BUILD_DIR)/$(TARGET).dylib
-    # The `-undefined dynamic_lookup` option is helpful if you have no hard-coded references
-    LDFLAGS += -shared -undefined dynamic_lookup
-  else
-    # Otherwise, produce a .so
-    EXE := $(BUILD_DIR)/$(TARGET).so
-    LDFLAGS += -shared
-  endif
-endif
-
 ifeq ($(TARGET_WEB),1)
 EXE := $(BUILD_DIR)/$(TARGET).html
 	else
@@ -320,6 +308,36 @@ EXE := $(BUILD_DIR)/$(TARGET).html
 			EXE := $(BUILD_DIR)/$(TARGET)
 		endif
 	endif
+endif
+
+ifeq ($(XBOX_BUILD),1)
+  VERSION_CFLAGS += -D__XBOX_BUILD
+  RENDER_API := GL
+  WINDOW_API := SDL2
+  DISCORDRPC := 0
+  BUILD_AS_DLL := 1
+  STATIC_LINK := 0
+  BETTERCAMERA := 1
+  NODRAWINGDISTANCE := 1
+  TEXTURE_FIX := 1
+  TEXTSAVES := 1
+  EXTERNAL_DATA := 1
+endif
+
+ifeq ($(BUILD_AS_DLL),1)
+  # On Windows, produce a .dll
+  ifeq ($(WINDOWS_BUILD),1)
+    EXE := $(BUILD_DIR)/$(TARGET).dll
+    LDFLAGS += -shared
+  else ifeq ($(HOST_OS),Darwin)
+    # On macOS, produce a .dylib
+    EXE := $(BUILD_DIR)/$(TARGET).dylib
+    LDFLAGS += -shared -undefined dynamic_lookup
+  else
+    # Otherwise, produce a .so
+    EXE := $(BUILD_DIR)/$(TARGET).so
+    LDFLAGS += -shared
+  endif
 endif
 
 ELF := $(BUILD_DIR)/$(TARGET).elf
@@ -362,21 +380,6 @@ OPT_FLAGS += $(BITS)
 
 ifeq ($(TARGET_WEB),1)
   OPT_FLAGS := -O2 -g4 --source-map-base http://localhost:8080/
-endif
-
-
-ifeq ($(XBOX_BUILD),1)
-  VERSION_CFLAGS += -D__XBOX_BUILD
-  RENDER_API := GL
-  WINDOW_API := SDL2
-  DISCORDRPC := 0
-  BUILD_AS_DLL := 1
-  STATIC_LINK := 0
-  BETTERCAMERA := 1
-  NODRAWINGDISTANCE := 1
-  TEXTURE_FIX := 1
-  TEXTSAVES := 1
-  EXTERNAL_DATA := 1
 endif
 
 ifeq ($(TARGET_RPI),1)
@@ -1071,7 +1074,11 @@ $(BUILD_DIR)/%.o: %.s
 
 
 $(EXE): $(O_FILES) $(MIO0_FILES:.mio0=.o) $(SOUND_OBJ_FILES) $(ULTRA_O_FILES) $(GODDARD_O_FILES) $(if $(RPC_LIBS),$(BUILD_DIR)/$(RPC_LIBS),)
+ifeq ($(BUILD_AS_DLL),1)
+	$(LD) -shared -L $(BUILD_DIR) -o $@ $(O_FILES) $(SOUND_OBJ_FILES) $(ULTRA_O_FILES) $(GODDARD_O_FILES) $(LDFLAGS)
+else
 	$(LD) -L $(BUILD_DIR) -o $@ $(O_FILES) $(SOUND_OBJ_FILES) $(ULTRA_O_FILES) $(GODDARD_O_FILES) $(LDFLAGS)
+endif
 
 .PHONY: all clean distclean default diff test load libultra res
 .PRECIOUS: $(BUILD_DIR)/bin/%.elf $(SOUND_BIN_DIR)/%.ctl $(SOUND_BIN_DIR)/%.tbl $(SOUND_SAMPLE_TABLES) $(SOUND_BIN_DIR)/%.s $(BUILD_DIR)/%
